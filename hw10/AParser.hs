@@ -7,6 +7,7 @@ module AParser where
 import           Control.Applicative
 
 import           Data.Char
+import qualified Control.Monad
 
 -- A parser for a value of type a is a function which takes a String
 -- represnting the input to be parsed, and succeeds or fails; if it
@@ -57,3 +58,36 @@ posInt = Parser f
 ------------------------------------------------------------
 -- Your code goes below here
 ------------------------------------------------------------
+
+first :: (a -> b) -> (a, c) -> (b, c)
+first f (a, c) = (f a, c)
+
+instance Functor Parser where
+  fmap f (Parser func) = Parser g
+    where g str = fmap (first f) (func str)
+
+instance Applicative Parser where
+  pure a = Parser f
+    where f str = Just (a, str)
+  (<*>) pf pa = Parser f
+    where
+      f str = case runParser pf str of
+        Nothing -> Nothing
+        Just (a, fol) -> first a <$> runParser pa fol
+
+abParser :: Parser (Char, Char)
+abParser = (,) <$> char 'a' <*> char 'b'
+
+abParser_ :: Parser ()
+abParser_ = Control.Monad.void abParser
+
+intPair :: Parser [Integer]
+intPair = (\a _ b -> [a, b]) <$> posInt <*> char ' ' <*> posInt
+
+instance Alternative Parser where
+  empty = Parser (const Nothing)
+  (<|>) p1 p2 = Parser f
+    where f str = runParser p1 str <|> runParser p2 str
+
+intOrUppercase :: Parser ()
+intOrUppercase = Control.Monad.void posInt <|> Control.Monad.void (satisfy isUpper)
